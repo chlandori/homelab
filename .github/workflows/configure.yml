@@ -1,0 +1,53 @@
+name: Configure Homelab Host
+
+on:
+  workflow_dispatch:
+    inputs:
+      notebook_path:
+        description: "Absolute Windows path for persistent notebook storage"
+        required: true
+        default: "C:/homelab/notebooks"
+      jupyter_token:
+        description: "JupyterLab access token (leave blank to auto-generate)"
+        required: false
+        default: ""
+
+jobs:
+  configure:
+    name: Initial Host Configuration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          tags: tag:ci
+
+      - name: Create directories and write .env on host
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            New-Item -ItemType Directory -Force -Path "C:\homelab"
+            New-Item -ItemType Directory -Force -Path "${{ inputs.notebook_path }}"
+
+            $token = "${{ inputs.jupyter_token }}"
+            if (-not $token) {
+              $token = ([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32) | ForEach-Object { $_.ToString('x2') }) -join ''
+            }
+
+            "NOTEBOOK_PATH=${{ inputs.notebook_path }}`nJUPYTER_TOKEN=$token" | Set-Content -Path "C:\homelab\.env"
+
+            Write-Output "Configuration complete."
+            Write-Output "JupyterLab will be available on port 8888 via your Tailscale IP."
+            if (-not "${{ inputs.jupyter_token }}") {
+              Write-Output "Auto-generated JUPYTER_TOKEN written to C:\homelab\.env"
+            }
