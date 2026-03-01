@@ -28,11 +28,29 @@ A private Python-based data science lab built on the [MaxLab](https://hub.docker
 
 ## First-time setup
 
+### Step 1: Prepare the persistent storage directory
+
+Create the directory where JupyterLab notebooks will be stored. The default path is `/mnt/storage1/maxlab`, but you can use any path on your host:
+
+```bash
+mkdir -p /mnt/storage1/maxlab
+```
+
+**Important:** Configure directory permissions so the container user (UID 1000) can write files:
+
+```bash
+sudo chmod 775 /mnt/storage1/maxlab
+```
+
+This allows the MaxLab container (which runs as `maxlab` user with UID 1000) to create and modify files in this directory.
+
+### Step 2: Run the configuration workflow
+
 Run the **Configure Homelab Host** workflow once before the first deploy:
 
 1. Navigate to **Actions → Configure Homelab Host → Run workflow**.
 2. Fill in:
-   - **Notebook path** — Linux path where notebooks are stored persistently (default: `/mnt/storage/maxlab`).
+   - **Notebook path** — Linux path where notebooks are stored persistently (default: `/mnt/storage1/maxlab`). Use the path you just created.
    - **JupyterLab token** — Leave blank to auto-generate a secure token, or provide your own.
 3. Click **Run workflow**.
 
@@ -54,7 +72,43 @@ Enter the `JUPYTER_TOKEN` from `/home/$SSH_USER/homelab/.env` when prompted.
 
 ## Persistent storage
 
-Notebook files are stored at the path specified during configuration (default `/mnt/storage/maxlab`) and mounted into the container at `/home/jovyan/work`. Data survives container restarts and image updates.
+Notebook files are stored at the path specified during configuration (default `/mnt/storage1/maxlab`) and mounted into the container at `/home/jovyan/work`. Data survives container restarts and image updates.
+
+### How it works
+
+- The MaxLab container runs as the `maxlab` user (UID 1000, GID 1000)
+- The host directory is mounted as a bind mount into the container
+- Any files created or modified in JupyterLab's `/home/jovyan/work` directory appear on the host
+- Both container restarts and image updates preserve your data
+
+### Troubleshooting: Files don't persist
+
+If you create files in JupyterLab but they don't appear on your host machine:
+
+1. **Check directory permissions:**
+   ```bash
+   ls -la /mnt/storage1/maxlab
+   ```
+   Look for ownership and permissions. The directory should allow the container user (UID 1000) to write. If needed, fix permissions:
+   ```bash
+   sudo chmod 775 /mnt/storage1/maxlab
+   ```
+
+2. **Verify the mount is active:**
+   ```bash
+   docker inspect maxlab | grep -A 10 "Mounts"
+   ```
+   Look for a bind mount from your host directory to `/home/jovyan/work`.
+
+3. **Test from inside the container:**
+   ```bash
+   docker exec maxlab touch /home/jovyan/work/test.txt
+   ls -la /mnt/storage1/maxlab
+   ```
+   If you see `test.txt` on the host, the mount is working. If not, restart the container:
+   ```bash
+   docker compose restart maxlab
+   ```
 
 ---
 
