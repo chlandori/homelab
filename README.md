@@ -1,6 +1,6 @@
 # Homelab
 
-A private Python-based data science lab built on the [MaxLab](https://hub.docker.com/r/navigatorbbs/maxlab) container image, deployed to a Windows Server 2025 host via GitHub Actions and exposed securely over [Tailscale](https://tailscale.com).
+A private Python-based data science lab built on the [MaxLab](https://hub.docker.com/r/navigatorbbs/maxlab) container image, deployed to an Ubuntu Linux host via GitHub Actions and exposed securely over [Tailscale](https://tailscale.com).
 
 ---
 
@@ -11,30 +11,35 @@ GitHub Actions
      │
      ├─ tailscale/github-action  ──►  Joins runner to your tailnet
      │
-     └─ appleboy/ssh-action ──────►  Windows Server 2025 (Docker Engine)
+     └─ appleboy/ssh-action ──────►  Ubuntu Linux Host (Docker Engine)
                                           │
                                           └─ docker compose up
                                                └─ navigatorbbs/maxlab:latest
                                                     Port 8888  ◄──  Tailscale IP
-                                                    Volume: C:\homelab\notebooks
+                                                    Volume: /mnt/storage/maxlab
 ```
 
 ---
 
 ## Prerequisites
 
-### On the Windows Server 2025 host
+### On the Ubuntu Linux host
 
-1. **Docker Engine** — Install the Docker Engine for Windows (not Docker Desktop).
-2. **OpenSSH Server** — Enable via *Settings → Apps → Optional Features → OpenSSH Server*, or with PowerShell:
-   ```powershell
-   Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-   Start-Service sshd
-   Set-Service -Name sshd -StartupType Automatic
+1. **Docker Engine** — Install Docker from the [official repository](https://docs.docker.com/engine/install/ubuntu/).
+2. **OpenSSH Server** — Install and enable:
+   ```bash
+   sudo apt update
+   sudo apt install openssh-server
+   sudo systemctl start ssh
+   sudo systemctl enable ssh
    ```
-3. **Tailscale** — Install from <https://tailscale.com/download> and log in.  
+3. **Tailscale** — Install from <https://tailscale.com/download/linux/ubuntu> and log in:
+   ```bash
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+   ```
    The host's Tailscale IP (e.g. `100.x.x.x`) or MagicDNS hostname is used as `SSH_HOST`.
-4. **PowerShell** must be the default SSH shell (it is by default on Windows Server 2025).
+4. **SSH key-based authentication** — Ensure your GitHub Actions public key is in `~/.ssh/authorized_keys`.
 
 ### GitHub repository secrets
 
@@ -44,8 +49,8 @@ Add the following secrets under **Settings → Secrets and variables → Actions
 |---|---|
 | `TAILSCALE_AUTHKEY` | Reusable (or ephemeral) auth key from the [Tailscale admin console](https://login.tailscale.com/admin/settings/keys). Tag it with `tag:ci`. |
 | `SSH_HOST` | Tailscale IP or MagicDNS hostname of the Windows Server. |
-| `SSH_USER` | Windows username with permission to run Docker commands. |
-| `SSH_PRIVATE_KEY` | Private key whose public counterpart is in `%USERPROFILE%\.ssh\authorized_keys` on the host. |
+| `SSH_USER` | Ubuntu username with permission to run Docker commands. |
+| `SSH_PRIVATE_KEY` | Private key whose public counterpart is in `~/.ssh/authorized_keys` on the host. |
 
 ---
 
@@ -55,11 +60,11 @@ Run the **Configure Homelab Host** workflow once before the first deploy:
 
 1. Navigate to **Actions → Configure Homelab Host → Run workflow**.
 2. Fill in:
-   - **Notebook path** — Windows path where notebooks are stored persistently (default: `C:/homelab/notebooks`).
+   - **Notebook path** — Linux path where notebooks are stored persistently (default: `/mnt/storage/maxlab`).
    - **JupyterLab token** — Leave blank to auto-generate a secure token, or provide your own.
 3. Click **Run workflow**.
 
-This creates the required directories and writes `C:\homelab\.env` on the host.
+This creates the required directories and writes `.env` on the host at `/home/$SSH_USER/homelab/.env`.
 
 ---
 
@@ -73,7 +78,7 @@ The **Deploy MaxLab** workflow runs automatically on every push to `main` that c
 
 The workflow:
 1. Joins the GitHub Actions runner to your Tailscale tailnet.
-2. Copies `docker-compose.yml` to `C:\homelab\` on the host.
+2. Copies `docker-compose.yml` to `/home/$SSH_USER/homelab/` on the host.
 3. Pulls `navigatorbbs/maxlab:latest` and restarts the service via `docker compose up -d`.
 
 ---
@@ -86,13 +91,13 @@ Once deployed, open a browser on any device in your tailnet:
 http://<tailscale-ip-or-hostname>:8888
 ```
 
-Enter the `JUPYTER_TOKEN` from `C:\homelab\.env` when prompted.
+Enter the `JUPYTER_TOKEN` from `/home/$SSH_USER/homelab/.env` when prompted.
 
 ---
 
 ## Persistent storage
 
-Notebook files are stored at the path specified during configuration (default `C:\homelab\notebooks`) and mounted into the container at `/home/jovyan/work`. Data survives container restarts and image updates.
+Notebook files are stored at the path specified during configuration (default `/mnt/storage/maxlab`) and mounted into the container at `/home/jovyan/work`. Data survives container restarts and image updates.
 
 ---
 
@@ -100,6 +105,76 @@ Notebook files are stored at the path specified during configuration (default `C
 
 Copy `.env.example` to `.env` in the same directory as `docker-compose.yml` and edit the values, then:
 
-```powershell
+```bash
 docker compose up -d
 ```
+
+---
+
+## Quick Start Scripts
+
+This repository includes helper scripts to simplify common tasks. All scripts use bash and require Docker and Tailscale to be installed on your system.
+
+### `start.sh` — Start the container
+
+**Purpose:** Start the MaxLab container in the background.
+
+```bash
+./start.sh
+```
+
+**What it does:**
+- Runs `docker compose up -d` to start the container
+- Pulls the latest image if needed
+- Container runs in detached mode
+
+**When to use:** After initial setup or whenever you need to restart the MaxLab service.
+
+---
+
+### `stop.sh` — Stop the container
+
+**Purpose:** Stop the running MaxLab container gracefully.
+
+```bash
+./stop.sh
+```
+
+**What it does:**
+- Runs `docker compose down` to stop and remove the container
+- Preserves mounted volumes (persistent storage)
+
+**When to use:** When you're done using MaxLab or need to perform maintenance.
+
+---
+
+### `tailserve.sh` — Enable HTTPS access via Tailscale
+
+**Purpose:** Expose JupyterLab securely over HTTPS using Tailscale Serve.
+
+```bash
+./tailserve.sh
+```
+
+**What it does:**
+- Runs `tailscale serve --service=svc:maxlab --https=443 127.0.0.1:8888`
+- Creates a service that proxies HTTPS traffic on port 443 to the local JupyterLab on port 8888
+- Provides a secure, encrypted tunnel for remote access
+
+**When to use:** To access JupyterLab securely from outside your local network without exposing ports directly. After running this, you can access JupyterLab via `https://<tailscale-hostname>`.
+
+---
+
+### `tailrm.sh` — Disable Tailscale Serve
+
+**Purpose:** Remove the Tailscale Serve configuration.
+
+```bash
+./tailrm.sh
+```
+
+**What it does:**
+- Runs `tailscale serve --remove=svc:trans` to remove the service proxy
+- Stops exposing JupyterLab via Tailscale Serve
+
+**When to use:** When you no longer need remote HTTPS access via Tailscale.

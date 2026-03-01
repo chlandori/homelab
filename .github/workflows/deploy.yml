@@ -38,7 +38,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.yml"
-          target: "C:/homelab"
+          target: "/home/${{ secrets.SSH_USER }}/homelab"
 
       - name: Pull latest image
         if: github.event_name == 'push' || inputs.force_pull == true
@@ -55,4 +55,4 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: docker compose -f C:/homelab/docker-compose.yml up -d --remove-orphans
+          script: docker compose -f /home/${{ secrets.SSH_USER }}/homelab/docker-compose.yml up -d --remove-orphans

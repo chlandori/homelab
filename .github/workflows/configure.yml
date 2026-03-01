@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       notebook_path:
-        description: "Absolute Windows path for persistent notebook storage"
+        description: "Absolute Linux path for persistent notebook storage"
         required: true
-        default: "C:/homelab/notebooks"
+        default: "/mnt/storage/maxlab"
       jupyter_token:
         description: "JupyterLab access token (leave blank to auto-generate)"
         required: false
@@ -36,18 +36,19 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            New-Item -ItemType Directory -Force -Path "C:\homelab"
-            New-Item -ItemType Directory -Force -Path "${{ inputs.notebook_path }}"
-
-            $token = "${{ inputs.jupyter_token }}"
-            if (-not $token) {
-              $token = ([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32) | ForEach-Object { $_.ToString('x2') }) -join ''
-            }
-
-            "NOTEBOOK_PATH=${{ inputs.notebook_path }}`nJUPYTER_TOKEN=$token" | Set-Content -Path "C:\homelab\.env"
-
-            Write-Output "Configuration complete."
-            Write-Output "JupyterLab will be available on port 8888 via your Tailscale IP."
-            if (-not "${{ inputs.jupyter_token }}") {
-              Write-Output "Auto-generated JUPYTER_TOKEN written to C:\homelab\.env"
-            }
+            mkdir -p ${{ inputs.notebook_path }}
+            
+            TOKEN="${{ inputs.jupyter_token }}"
+            if [ -z "$TOKEN" ]; then
+              TOKEN=$(openssl rand -hex 32)
+            fi
+            
+            mkdir -p /home/${{ secrets.SSH_USER }}/homelab
+            echo "NOTEBOOK_PATH=${{ inputs.notebook_path }}" > /home/${{ secrets.SSH_USER }}/homelab/.env
+            echo "JUPYTER_TOKEN=$TOKEN" >> /home/${{ secrets.SSH_USER }}/homelab/.env
+            
+            echo "Configuration complete."
+            echo "JupyterLab will be available on port 8888 via your Tailscale IP."
+            if [ -z "${{ inputs.jupyter_token }}" ]; then
+              echo "Auto-generated JUPYTER_TOKEN written to /home/${{ secrets.SSH_USER }}/homelab/.env"
+            fi

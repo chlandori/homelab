@@ -6,6 +6,6 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - ${NOTEBOOK_PATH:-C:/homelab/notebooks}:/home/jovyan/work
+      - ${NOTEBOOK_PATH:-/mnt/storage/maxlab}:/home/jovyan/work
     environment:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN}
