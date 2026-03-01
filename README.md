@@ -1,23 +1,6 @@
 # Homelab
 
-A private Python-based data science lab built on the [MaxLab](https://hub.docker.com/r/navigatorbbs/maxlab) container image, deployed to an Ubuntu Linux host via GitHub Actions and exposed securely over [Tailscale](https://tailscale.com).
-
----
-
-## Architecture
-
-```
-GitHub Actions
-     │
-     ├─ tailscale/github-action  ──►  Joins runner to your tailnet
-     │
-     └─ appleboy/ssh-action ──────►  Ubuntu Linux Host (Docker Engine)
-                                          │
-                                          └─ docker compose up
-                                               └─ navigatorbbs/maxlab:latest
-                                                    Port 8888  ◄──  Tailscale IP
-                                                    Volume: /mnt/storage/maxlab
-```
+A private Python-based data science lab built on the [MaxLab](https://hub.docker.com/r/navigatorbbs/maxlab) container image exposed securely over [Tailscale](https://tailscale.com).
 
 ---
 
@@ -41,18 +24,7 @@ GitHub Actions
    The host's Tailscale IP (e.g. `100.x.x.x`) or MagicDNS hostname is used as `SSH_HOST`.
 4. **SSH key-based authentication** — Ensure your GitHub Actions public key is in `~/.ssh/authorized_keys`.
 
-### GitHub repository secrets
-
-Add the following secrets under **Settings → Secrets and variables → Actions**:
-
-| Secret | Description |
-|---|---|
-| `TAILSCALE_AUTHKEY` | Reusable (or ephemeral) auth key from the [Tailscale admin console](https://login.tailscale.com/admin/settings/keys). Tag it with `tag:ci`. |
-| `SSH_HOST` | Tailscale IP or MagicDNS hostname of the Windows Server. |
-| `SSH_USER` | Ubuntu username with permission to run Docker commands. |
-| `SSH_PRIVATE_KEY` | Private key whose public counterpart is in `~/.ssh/authorized_keys` on the host. |
-
----
+--
 
 ## First-time setup
 
@@ -65,21 +37,6 @@ Run the **Configure Homelab Host** workflow once before the first deploy:
 3. Click **Run workflow**.
 
 This creates the required directories and writes `.env` on the host at `/home/$SSH_USER/homelab/.env`.
-
----
-
-## Deploying
-
-The **Deploy MaxLab** workflow runs automatically on every push to `main` that changes `docker-compose.yml` or the deploy workflow file. You can also trigger it manually:
-
-1. Navigate to **Actions → Deploy MaxLab → Run workflow**.
-2. Optionally enable **Force pull** to pull the latest image even if the compose file hasn't changed.
-3. Click **Run workflow**.
-
-The workflow:
-1. Joins the GitHub Actions runner to your Tailscale tailnet.
-2. Copies `docker-compose.yml` to `/home/$SSH_USER/homelab/` on the host.
-3. Pulls `navigatorbbs/maxlab:latest` and restarts the service via `docker compose up -d`.
 
 ---
 
@@ -174,7 +131,7 @@ This repository includes helper scripts to simplify common tasks. All scripts us
 ```
 
 **What it does:**
-- Runs `tailscale serve --remove=svc:trans` to remove the service proxy
+- Runs `tailscale serve --remove=svc:maxlab` to remove the service proxy
 - Stops exposing JupyterLab via Tailscale Serve
 
 **When to use:** When you no longer need remote HTTPS access via Tailscale.
