@@ -1,11 +1,12 @@
 services:
   maxlab:
-    image: navigatorbbs/maxlab:latest
+    image: navigatorbbs/maxlab:v0.1.2
     container_name: maxlab
     restart: unless-stopped
     ports:
       - "8888:8888"
     volumes:
-      - ${NOTEBOOK_PATH:-/mnt/storage/maxlab}:/home/jovyan/work
+      - ${NOTEBOOK_PATH:-/mnt/storage1/maxlab}:/home/maxlab/workspace
     environment:
-      JUPYTER_TOKEN: ${JUPYTER_TOKEN}
+      - GITHUB_COPILOT_PAT=${GITHUB_COPILOT_PAT:-}
+
