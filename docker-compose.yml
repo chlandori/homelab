@@ -1,6 +1,6 @@
 services:
   maxlab:
-    image: navigatorbbs/maxlab:v0.1.2
+    image: navigatorbbs/maxlab:v0.1.4
     container_name: maxlab
     restart: unless-stopped
     ports:
